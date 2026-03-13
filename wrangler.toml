@@ -1,0 +1,4 @@
+name = "court-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+account_id = "d756cfe027a22dcc6bb057ddac43d8e6"

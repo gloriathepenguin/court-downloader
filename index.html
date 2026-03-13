@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>法院文书批量下载</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface2: #242424;
+      --border: #2e2e2e;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --accent-dim: rgba(59,130,246,0.12);
+      --success: #22c55e;
+      --text: #e5e7eb;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --radius: 10px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                   "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo {
+      width: 36px; height: 36px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    header h1 { font-size: 1.05rem; font-weight: 600; }
+    header p  { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+
+    main {
+      flex: 1;
+      padding: 24px 16px;
+      max-width: 700px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 12px;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.9rem;
+      line-height: 1.55;
+      padding: 12px 14px;
+      resize: vertical;
+      min-height: 100px;
+      outline: none;
+      transition: border-color .2s;
+      font-family: inherit;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--text-muted); }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 0 18px; height: 40px;
+      border-radius: 8px; font-size: 0.88rem; font-weight: 500;
+      cursor: pointer; border: none;
+      transition: background .15s, opacity .15s, transform .1s;
+      white-space: nowrap; user-select: none;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-outline {
+      background: transparent; color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover:not(:disabled) { background: var(--surface2); color: var(--text); border-color: #444; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #16a34a; }
+    .btn-sm { height: 32px; padding: 0 12px; font-size: 0.82rem; }
+
+    .row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+    .row .btn { flex: 1; min-width: 120px; }
+
+    /* ── Banner ── */
+    .banner {
+      display: none; border-radius: 8px; padding: 12px 14px;
+      font-size: 0.87rem; line-height: 1.5; margin-bottom: 16px;
+      gap: 10px; align-items: flex-start;
+    }
+    .banner.show { display: flex; }
+    .banner.info    { background: var(--accent-dim); border: 1px solid rgba(59,130,246,.3); color: #93c5fd; }
+    .banner.error   { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
+    .banner.success { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); color: #86efac; }
+    .banner .icon { flex-shrink: 0; }
+
+    /* ── File list ── */
+    #file-section { display: none; }
+
+    .toolbar {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .toolbar-l { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .toolbar-r { display: flex; gap: 8px; }
+    .count-badge {
+      font-size: 0.82rem; background: var(--accent-dim);
+      color: var(--accent); border-radius: 20px; padding: 2px 10px;
+      display: none;
+    }
+
+    /* checkbox */
+    .chk-wrap {
+      display: inline-flex; align-items: center; gap: 7px;
+      cursor: pointer; font-size: 0.88rem; color: var(--text-dim); user-select: none;
+    }
+    .chk-wrap input[type=checkbox] {
+      appearance: none; width: 16px; height: 16px;
+      border: 1.5px solid var(--border); border-radius: 4px;
+      background: var(--bg); cursor: pointer; flex-shrink: 0;
+      position: relative; transition: border-color .15s, background .15s;
+    }
+    .chk-wrap input[type=checkbox]:checked,
+    .chk-wrap input[type=checkbox]:indeterminate {
+      background: var(--accent); border-color: var(--accent);
+    }
+    .chk-wrap input[type=checkbox]:checked::after {
+      content: ''; position: absolute;
+      left: 3px; top: 1px; width: 8px; height: 5px;
+      border-left: 2px solid #fff; border-bottom: 2px solid #fff;
+      transform: rotate(-45deg);
+    }
+    .chk-wrap input[type=checkbox]:indeterminate::after {
+      content: ''; position: absolute;
+      left: 3px; top: 6px; width: 8px; height: 2px; background: #fff;
+    }
+
+    /* file item */
+    .file-list { display: flex; flex-direction: column; gap: 6px; }
+    .file-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; transition: border-color .15s, background .15s;
+    }
+    .file-item:hover { border-color: #3a3a3a; }
+    .file-item.selected { border-color: rgba(59,130,246,.35); background: var(--accent-dim); }
+    .pdf-icon {
+      flex-shrink: 0; width: 30px; height: 30px;
+      background: rgba(239,68,68,.15); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 700; color: #f87171;
+    }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name {
+      font-size: 0.88rem; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .file-url {
+      font-size: 0.73rem; color: var(--text-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;
+    }
+    .fstatus {
+      font-size: 0.73rem; padding: 2px 8px; border-radius: 20px; flex-shrink: 0;
+    }
+    .fstatus.idle    { background: rgba(107,114,128,.15); color: var(--text-muted); }
+    .fstatus.loading { background: rgba(59,130,246,.15);  color: #60a5fa; }
+    .fstatus.done    { background: rgba(34,197,94,.15);   color: #4ade80; }
+    .fstatus.fail    { background: rgba(239,68,68,.15);   color: #f87171; }
+
+    /* progress */
+    .progress { display: none; flex-direction: column; gap: 6px; margin-top: 12px; }
+    .progress.show { display: flex; }
+    .progress-label { font-size: 0.84rem; color: var(--text-dim); }
+    .progress-track { height: 5px; background: var(--border); border-radius: 20px; overflow: hidden; }
+    .progress-fill  { height: 100%; background: var(--accent); border-radius: 20px; transition: width .3s; width: 0%; }
+
+    /* spinner */
+    .spin {
+      display: inline-block; width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: s .65s linear infinite; flex-shrink: 0;
+    }
+    @keyframes s { to { transform: rotate(360deg); } }
+
+    footer {
+      text-align: center; padding: 20px 16px;
+      font-size: 0.77rem; color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 480px) {
+      header { padding: 14px 16px; }
+      .card  { padding: 16px; }
+      .toolbar { flex-direction: column; align-items: flex-start; }
+      .toolbar-r { width: 100%; }
+      .toolbar-r .btn { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚖</div>
+  <div>
+    <h1>法院文书批量下载</h1>
+    <p>粘贴短信内容或链接，批量下载电子送达文书</p>
+  </div>
+</header>
+
+<main>
+
+  <div class="card">
+    <div class="card-title">粘贴短信或链接</div>
+    <textarea id="sms-input"
+      placeholder="将法院短信内容或链接粘贴到此处，例如：&#10;【上海铁路运输法院】...点击链接查阅：https://zxfw.court.gov.cn/zxfw/#/...?qdbh=...&sdbh=...&sdsin=..."></textarea>
+    <div class="row">
+      <button class="btn btn-primary" id="fetch-btn" onclick="fetchDocuments()">
+        <span id="fetch-icon">🔍</span>
+        <span id="fetch-text">获取文件列表</span>
+      </button>
+      <button class="btn btn-outline" onclick="clearAll()">清空</button>
+    </div>
+  </div>
+
+  <div id="banner" class="banner">
+    <span class="icon" id="banner-icon"></span>
+    <span id="banner-msg"></span>
+  </div>
+
+  <div id="file-section">
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-l">
+          <label class="chk-wrap">
+            <input type="checkbox" id="sel-all" onchange="toggleAll(this)" /> 全选
+          </label>
+          <span id="total-label" style="font-size:.84rem;color:var(--text-muted)"></span>
+          <span id="sel-badge" class="count-badge"></span>
+        </div>
+        <div class="toolbar-r">
+          <button class="btn btn-outline btn-sm" id="btn-sel" onclick="downloadSelected()" disabled>↓ 下载选中</button>
+          <button class="btn btn-success btn-sm" id="btn-zip" onclick="downloadZip()" disabled>
+            <span id="zip-icon">📦</span>
+            <span id="zip-text">打包 ZIP</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="file-list" class="file-list"></div>
+
+      <div id="progress" class="progress">
+        <div class="progress-label" id="prog-label">准备中...</div>
+        <div class="progress-track"><div class="progress-fill" id="prog-fill"></div></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>本工具仅供当事人合法查阅本人送达文书使用，不存储任何文书内容。</footer>
+
+<script>
+// ── 常量 ──────────────────────────────────────────────────────────
+// 部署 Cloudflare Worker 后，把下面的地址换成你的 Worker URL
+// 例如：https://court-proxy.yourname.workers.dev
+const PROXY_BASE = 'https://proxy.legalhelper.work'
+
+const API = 'https://zxfw.court.gov.cn/yzw/yzw-zxfw-sdfw/api/v1/sdfw/getWsListBySdbhNew'
+const URL_RE = /https?:\/\/zxfw\.court\.gov\.cn\/[^\s"'<>]+/
+
+function proxyUrl(url) {
+  return PROXY_BASE + '/?url=' + encodeURIComponent(url)
+}
+
+const API_HEADERS = {
+  'Content-Type': 'application/json',
+  'Accept': '*/*',
+  'Accept-Language': 'zh-CN,zh;q=0.9',
+  'Origin': 'https://zxfw.court.gov.cn',
+  'Referer': 'https://zxfw.court.gov.cn/zxfw/',
+}
+
+let docs = []
+let sel = new Set()
+
+// ── 解析链接参数 ─────────────────────────────────────────────────
+function extractParams(text) {
+  const m = text.match(URL_RE)
+  if (!m) return null
+  const raw = m[0]
+  let qs = ''
+  const hi = raw.indexOf('#')
+  if (hi !== -1) {
+    const after = raw.slice(hi + 1)
+    const qi = after.indexOf('?')
+    qs = qi !== -1 ? after.slice(qi + 1) : after
+  } else {
+    const qi = raw.indexOf('?')
+    qs = qi !== -1 ? raw.slice(qi + 1) : ''
+  }
+  const p = new URLSearchParams(qs)
+  const sdbh = p.get('sdbh'), qdbh = p.get('qdbh'), sdsin = p.get('sdsin')
+  return (sdbh && qdbh && sdsin) ? { sdbh, qdbh, sdsin } : null
+}
+
+// ── 获取文件列表 ─────────────────────────────────────────────────
+async function fetchDocuments() {
+  const text = document.getElementById('sms-input').value.trim()
+  if (!text) { showBanner('请粘贴短信内容或链接', 'error'); return }
+
+  const params = extractParams(text)
+  if (!params) {
+    showBanner('未找到有效的法院链接（需包含 zxfw.court.gov.cn 且带完整参数）', 'error')
+    return
+  }
+
+  setFetchLoading(true)
+  hideBanner()
+
+  try {
+    const res = await fetch(proxyUrl(API), {
+      method: 'POST',
+      headers: API_HEADERS,
+      body: JSON.stringify(params),
+    })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    const data = await res.json()
+
+    if (data.code === 200 && Array.isArray(data.data)) {
+      docs = data.data
+        .filter(d => d.c_wsmc && d.wjlj)
+        .map((d, i) => ({ id: i, name: d.c_wsmc, url: d.wjlj }))
+      if (!docs.length) {
+        showBanner('接口返回成功，但文书列表为空', 'error')
+      } else {
+        renderList()
+        showBanner(`已获取 ${docs.length} 份文书，请选择后下载`, 'success')
+      }
+    } else {
+      showBanner('接口返回异常：' + (data.msg || JSON.stringify(data).slice(0, 100)), 'error')
+    }
+  } catch (e) {
+    // CORS 错误时 e.message 通常是 "Failed to fetch"
+    const isCors = e.message.includes('fetch') || e.message.includes('CORS') || e.message.includes('Network')
+    if (isCors) {
+      showBanner(
+        '跨域请求被拦截（CORS）。请确认：①在国内网络环境下使用；②未开启 VPN；③浏览器未拦截请求。如问题持续，请告知。',
+        'error'
+      )
+    } else {
+      showBanner('请求失败：' + e.message, 'error')
+    }
+  } finally {
+    setFetchLoading(false)
+  }
+}
+
+function setFetchLoading(on) {
+  const btn = document.getElementById('fetch-btn')
+  btn.disabled = on
+  document.getElementById('fetch-icon').innerHTML = on ? '<span class="spin"></span>' : '🔍'
+  document.getElementById('fetch-text').textContent = on ? '获取中...' : '获取文件列表'
+}
+
+// ── 渲染列表 ─────────────────────────────────────────────────────
+function renderList() {
+  sel = new Set(docs.map(d => d.id))
+  const list = document.getElementById('file-list')
+  list.innerHTML = ''
+  docs.forEach(doc => {
+    const el = document.createElement('div')
+    el.className = 'file-item selected'
+    el.id = 'fi-' + doc.id
+    el.innerHTML = `
+      <label class="chk-wrap" style="flex-shrink:0">
+        <input type="checkbox" checked onchange="toggleFile(${doc.id},this)" />
+      </label>
+      <div class="pdf-icon">PDF</div>
+      <div class="file-info">
+        <div class="file-name" title="${esc(doc.name)}">${esc(doc.name)}</div>
+        <div class="file-url">${esc(doc.url.slice(0,80))}${doc.url.length>80?'…':''}</div>
+      </div>
+      <span class="fstatus idle" id="fs-${doc.id}">待下载</span>
+      <button class="btn btn-outline btn-sm" onclick="downloadOne(${doc.id})" style="flex-shrink:0">↓</button>
+    `
+    list.appendChild(el)
+  })
+  document.getElementById('file-section').style.display = 'block'
+  updateUI()
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+// ── 选择逻辑 ─────────────────────────────────────────────────────
+function toggleFile(id, chk) {
+  chk.checked ? sel.add(id) : sel.delete(id)
+  document.getElementById('fi-'+id)?.classList.toggle('selected', chk.checked)
+  updateUI()
+}
+
+function toggleAll(chk) {
+  docs.forEach(d => {
+    const c = document.querySelector('#fi-'+d.id+' input[type=checkbox]')
+    if (c) c.checked = chk.checked
+    chk.checked ? sel.add(d.id) : sel.delete(d.id)
+    document.getElementById('fi-'+d.id)?.classList.toggle('selected', chk.checked)
+  })
+  updateUI()
+}
+
+function updateUI() {
+  const total = docs.length, s = sel.size
+  const allChk = document.getElementById('sel-all')
+  allChk.checked = s === total
+  allChk.indeterminate = s > 0 && s < total
+  document.getElementById('total-label').textContent = '共 ' + total + ' 份'
+  const badge = document.getElementById('sel-badge')
+  if (s < total) { badge.style.display='inline'; badge.textContent='已选 '+s }
+  else badge.style.display='none'
+  document.getElementById('btn-sel').disabled = s === 0
+  document.getElementById('btn-zip').disabled = s === 0
+}
+
+// ── 进度 ─────────────────────────────────────────────────────────
+function showProgress(label, pct) {
+  const w = document.getElementById('progress')
+  w.classList.add('show')
+  document.getElementById('prog-label').textContent = label
+  document.getElementById('prog-fill').style.width = pct + '%'
+}
+function hideProgress() { document.getElementById('progress').classList.remove('show') }
+
+function setFStatus(id, cls, text) {
+  const el = document.getElementById('fs-'+id)
+  if (!el) return
+  el.className = 'fstatus ' + cls
+  el.textContent = text
+}
+
+// ── 单个下载 ─────────────────────────────────────────────────────
+async function downloadOne(id) {
+  const doc = docs.find(d => d.id === id); if (!doc) return
+  setFStatus(id, 'loading', '下载中')
+  try {
+    const blob = await fetchBlob(doc.url)
+    triggerSave(blob, doc.name + '.pdf')
+    setFStatus(id, 'done', '✓')
+  } catch (e) {
+    setFStatus(id, 'fail', '失败')
+    showBanner('下载失败：' + e.message, 'error')
+  }
+}
+
+// ── 逐一下载选中 ─────────────────────────────────────────────────
+async function downloadSelected() {
+  const ids = [...sel]; if (!ids.length) return
+  const btn = document.getElementById('btn-sel')
+  btn.disabled = true; btn.textContent = '下载中...'
+  let done = 0
+  const items = ids.map(id => docs.find(d => d.id === id)).filter(Boolean)
+  items.forEach(doc => setFStatus(doc.id, 'loading', '下载中'))
+  await withConcurrency(items, 3, async (doc) => {
+    try {
+      const blob = await fetchBlob(doc.url)
+      triggerSave(blob, doc.name + '.pdf')
+      setFStatus(doc.id, 'done', '✓')
+    } catch { setFStatus(doc.id, 'fail', '失败') }
+    done++
+    showProgress(`下载 ${done}/${items.length}`, Math.round(done/items.length*100))
+  })
+  showProgress('完成', 100)
+  setTimeout(hideProgress, 1800)
+  btn.disabled = false; btn.textContent = '↓ 下载选中'
+}
+
+// ── ZIP 打包下载 ──────────────────────────────────────────────────
+async function downloadZip() {
+  const ids = [...sel]; if (!ids.length) return
+  if (!window.JSZip) {
+    try { await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js') }
+    catch { showBanner('无法加载 JSZip 库，请检查网络', 'error'); return }
+  }
+  const btn = document.getElementById('btn-zip')
+  btn.disabled = true
+  document.getElementById('zip-icon').innerHTML = '<span class="spin"></span>'
+  document.getElementById('zip-text').textContent = '打包中...'
+
+  const zip = new window.JSZip()
+  const used = new Set()
+  let ok = 0, fail = 0, done = 0
+  const items = ids.map(id => docs.find(d => d.id === id)).filter(Boolean)
+  items.forEach(doc => setFStatus(doc.id, 'loading', '打包中'))
+
+  await withConcurrency(items, 3, async (doc) => {
+    try {
+      const blob = await fetchBlob(doc.url)
+      let name = sanitize(doc.name) + '.pdf'
+      let n = 1, base = name.replace(/\.pdf$/, '')
+      while (used.has(name)) name = `${base}_${n++}.pdf`
+      used.add(name)
+      zip.file(name, blob)
+      setFStatus(doc.id, 'done', '✓'); ok++
+    } catch { setFStatus(doc.id, 'fail', '失败'); fail++ }
+    done++
+    showProgress(`打包 ${done}/${items.length}`, Math.round(done/items.length*100))
+  })
+
+  if (ok === 0) {
+    showBanner('所有文件下载失败，无法生成 ZIP', 'error')
+  } else {
+    showProgress('生成 ZIP...', 100)
+    const content = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' })
+    triggerSave(content, '法院文书_' + Date.now() + '.zip')
+    showBanner(`ZIP 已生成：${ok} 份成功${fail ? '，' + fail + ' 份失败' : ''}`, ok===ids.length?'success':'info')
+  }
+
+  hideProgress()
+  btn.disabled = false
+  document.getElementById('zip-icon').textContent = '📦'
+  document.getElementById('zip-text').textContent = '打包 ZIP'
+}
+
+// ── 工具函数 ─────────────────────────────────────────────────────
+async function withConcurrency(items, limit, fn) {
+  let idx = 0
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++
+      await fn(items[i], i)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+}
+
+async function fetchBlob(url) {
+  const res = await fetch(proxyUrl(url))
+  if (!res.ok) throw new Error('HTTP ' + res.status)
+  return res.blob()
+}
+
+function triggerSave(blob, filename) {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href) }, 500)
+}
+
+function sanitize(s) { return String(s).replace(/[\\/*?":<>|]/g, '_') }
+function sleep(ms)    { return new Promise(r => setTimeout(r, ms)) }
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script')
+    s.src = src; s.onload = res; s.onerror = rej
+    document.head.appendChild(s)
+  })
+}
+
+function showBanner(msg, type = 'info') {
+  const icons = { info: 'ℹ', error: '✕', success: '✓' }
+  const el = document.getElementById('banner')
+  el.className = 'banner show ' + type
+  document.getElementById('banner-icon').textContent = icons[type]
+  document.getElementById('banner-msg').textContent = msg
+}
+function hideBanner() { document.getElementById('banner').className = 'banner' }
+
+function clearAll() {
+  document.getElementById('sms-input').value = ''
+  document.getElementById('file-section').style.display = 'none'
+  document.getElementById('file-list').innerHTML = ''
+  docs = []; sel.clear(); hideBanner(); hideProgress()
+}
+
+// Ctrl+Enter 快捷键
+document.getElementById('sms-input').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') fetchDocuments()
+})
+</script>
+</body>
+</html>
